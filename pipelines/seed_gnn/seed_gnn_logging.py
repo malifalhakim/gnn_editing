@@ -1,7 +1,7 @@
 import logging
 import torch
-logger = logging.getLogger("main")
 
+logger = logging.getLogger("main")
 
 class Logger(object):
     def __init__(self):
