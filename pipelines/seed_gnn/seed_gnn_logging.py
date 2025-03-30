@@ -7,11 +7,9 @@ class Logger(object):
     def __init__(self):
         self.results = []
 
-
     def add_result(self, result):
         assert len(result) == 3
         self.results.append(result)
-
 
     def print_statistics(self):
         result = 100 * torch.tensor(self.results)

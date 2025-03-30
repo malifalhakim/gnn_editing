@@ -5,8 +5,6 @@ from typing import Tuple, Union, Optional
 import time
 import numpy as np
 import pandas as pd
-import os
-import copy
 import torch
 import scipy.io as sio
 from torch import Tensor
@@ -25,9 +23,6 @@ def gen_masks(y: Tensor, train_per_class: int = 20, val_per_class: int = 30,
               num_splits: int = 20) -> Tuple[Tensor, Tensor, Tensor]:
     num_classes = int(y.max()) + 1
 
-    # train_mask = torch.zeros(y.size(0), num_splits, dtype=torch.bool)
-    # val_mask = torch.zeros(y.size(0), num_splits, dtype=torch.bool)
-
     train_mask = torch.zeros(y.size(0), dtype=torch.bool)
     val_mask = torch.zeros(y.size(0), dtype=torch.bool)
 
@@ -41,10 +36,8 @@ def gen_masks(y: Tensor, train_per_class: int = 20, val_per_class: int = 30,
             [torch.randperm(idx.size(0)) for _ in range(num_splits)], dim=1)
         idx = idx[perm]
         train_idx = idx[:train_per_class]
-        # train_mask.scatter_(0, train_idx, True)
         train_mask[train_idx] = True
         val_idx = idx[train_per_class:train_per_class + val_per_class]
-        # val_mask.scatter_(0, val_idx, True)
         val_mask[val_idx] = True
 
     test_mask = ~(train_mask | val_mask)
@@ -133,7 +126,6 @@ def get_reddit(root: str) -> Tuple[Data, int, int]:
     data = dataset[0]
     data.x = (data.x - data.x.mean(dim=0)) / data.x.std(dim=0)
     return data, dataset.num_features, dataset.num_classes
-
 
 
 def get_sbm(root: str, name: str) -> Tuple[Data, int, int]:

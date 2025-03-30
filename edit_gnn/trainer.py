@@ -1,12 +1,10 @@
 import os
 import time
-import pdb
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Dict, List
 from pathlib import Path
 from copy import deepcopy
 
 import torch
-import torch.nn as nn
 import numpy as np
 import re
 import torch.nn.functional as F
@@ -17,7 +15,9 @@ from torch_geometric.data.data import Data
 from editable_gnn.models.base import BaseModel
 from editable_gnn.logger import Logger
 from editable_gnn.utils import set_seeds_all
+
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+
 class BaseTrainer(object):
     def __init__(self,
                  args,
@@ -54,7 +54,6 @@ class BaseTrainer(object):
         self.half_half = args.half_half
         self.half_half_ratio_mixup = args.half_half_ratio_mixup
 
-
     def train_loop(self,
                    model: BaseModel,
                    optimizer: torch.optim.Optimizer,
@@ -69,13 +68,11 @@ class BaseTrainer(object):
         optimizer.step()
         return loss.item()
 
-
     def train(self):
         for run in range(self.runs):
             set_seeds_all(self.seed + run)
             self.single_run(run)
         self.logger.print_statistics()
-
 
     def save_model(self, checkpoint_prefix: str, epoch: int):
         best_model_checkpoint = os.path.join(self.save_path, f'{checkpoint_prefix}_{epoch}.pt')
@@ -85,7 +82,6 @@ class BaseTrainer(object):
         checkpoints_to_be_deleted = checkpoints_sorted[:number_of_checkpoints_to_delete]
         for checkpoint in checkpoints_to_be_deleted:
             os.remove(f'./{checkpoint}')
-
 
     def single_run(self, run: int):
         if not self.load_pretrained_backbone:
@@ -110,7 +106,6 @@ class BaseTrainer(object):
                     f'Valid f1: {100 * valid_acc:.2f}% '
                     f'Test f1: {100 * test_acc:.2f}%')
         self.logger.print_statistics(run)
-
 
     @staticmethod
     def compute_micro_f1(logits, y, mask=None) -> float:
@@ -137,7 +132,6 @@ class BaseTrainer(object):
             except ZeroDivisionError:
                 return 0.
 
-
     @torch.no_grad()
     def test(self, model: BaseModel, data: Data, specific_class: int = None):
         model.eval()
@@ -158,13 +152,11 @@ class BaseTrainer(object):
         test_acc = self.compute_micro_f1(out, y_true, test_mask)
         return train_acc, valid_acc, test_acc
 
-
     @torch.no_grad()
     def prediction(self, model: BaseModel, data: Data):
         model.eval()
         input = self.grab_input(data)
         return model(**input)
-
 
     @staticmethod
     def sorted_checkpoints(
@@ -183,6 +175,7 @@ class BaseTrainer(object):
 
         checkpoints_sorted = sorted(ordering_and_checkpoint_path)
         checkpoints_sorted = [checkpoint[1] for checkpoint in checkpoints_sorted]
+
         # Make sure we don't delete the best model.
         if best_model_checkpoint is not None:
             best_model_index = checkpoints_sorted.index(str(Path(best_model_checkpoint)))
@@ -191,7 +184,6 @@ class BaseTrainer(object):
                 checkpoints_sorted[best_model_index],
             )
         return checkpoints_sorted
-
 
     @staticmethod
     def get_optimizer(model_config, model, layers = None):
@@ -211,7 +203,6 @@ class BaseTrainer(object):
                 raise NotImplementedError
 
         return optimizer
-
 
     def select_node(self, whole_data: Data,
                     num_classes: int,
@@ -274,7 +265,6 @@ class BaseTrainer(object):
             else:
                 train_mixup_training_samples_idx = right_pred_set[torch.randperm(len(right_pred_set))[:num_samples]].type(torch.LongTensor)
 
-            #pdb.set_trace()
             mixup_training_samples_idx = nodes_set[train_mixup_training_samples_idx]
             mixup_label = whole_data.y[mixup_training_samples_idx]
 
@@ -293,6 +283,7 @@ class BaseTrainer(object):
             loss.backward()
             optimizer.step()
             y_pred = out.argmax(dim=-1)
+
             # sequential or independent setting
             if label.shape[0] == 1:
                 if y_pred == label:
@@ -300,11 +291,13 @@ class BaseTrainer(object):
                     break
                 else:
                     success = False
+
             # batch setting
             else:
                 success = int(y_pred.eq(label).sum()) / label.size(0)
                 if success == 1.:
                     break
+
         torch.cuda.synchronize()
         e = time.time()
         print(f'edit time: {e - s}')
@@ -327,6 +320,7 @@ class BaseTrainer(object):
                 success = True
             else:
                 success = False
+
         # batch setting
         else:
             success = 1.0 if y_pred.eq(label)[curr_edit_target] else 0.0
@@ -342,7 +336,6 @@ class BaseTrainer(object):
 
         return self.single_edit(model, idx, f_label, optimizer, max_num_step, num_edit_targets=num_edit_targets)
 
-
     def sequential_edit(self, node_idx_2flip, flipped_label, whole_data, max_num_step, specific_class=None):
         model = deepcopy(self.model)
         optimizer = self.get_optimizer(self.model_config, model)
@@ -350,7 +343,7 @@ class BaseTrainer(object):
         i = 0
         for idx, f_label in tqdm(zip(node_idx_2flip, flipped_label)):
             i = i + 1
-            # edited_model, success, loss, steps = self.single_edit(model, idx, f_label, optimizer, max_num_step)
+        
             edited_model, success, loss, steps, mem, tot_time = self.edit_select(model, idx, f_label, optimizer, max_num_step)
             success = self.success_rate(model, node_idx_2flip[:i].squeeze(dim=1), flipped_label[:i].squeeze(dim=1))
             if specific_class is None:
@@ -401,16 +394,13 @@ class BaseTrainer(object):
                                                                     curr_edit_target=num_edit_targets - 1)
             else:
                 edited_model, success, loss, steps, mem, tot_time = self.edit_select(model, node_idx_2flip[:idx + 1].squeeze(dim=1), flipped_label[:idx + 1].squeeze(dim=1), optimizer, max_num_step, curr_edit_target=idx)
-            #get success
-            #print(self.success_rate(model, node_idx_2flip[:idx + 1].squeeze(dim=1), flipped_label[:idx + 1].squeeze(dim=1)))
-            #print(flipped_label[:idx+1].squeeze(dim=1))
+            
             success = self.success_rate(model, node_idx_2flip[:idx+1].squeeze(dim=1), flipped_label[:idx+1].squeeze(dim=1))
             res = [*self.test(edited_model, whole_data), success, steps]
             res.append(mem)
             res.append(tot_time)
             results_temporary.append(res)
         return results_temporary
-
 
     def eval_edit_quality(self, node_idx_2flip, flipped_label, whole_data, max_num_step, bef_edit_results, eval_setting):
         bef_edit_tra_acc, bef_edit_val_acc, bef_edit_tst_acc = bef_edit_results
@@ -591,6 +581,7 @@ class WholeGraphTrainer(BaseTrainer):
         else:
             out = model(**input)
             y_pred = out.argmax(dim=-1)[idx]
+            
         success = int(y_pred.eq(label).sum()) / label.size(0)
         torch.cuda.synchronize()
         return success

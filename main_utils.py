@@ -4,7 +4,6 @@ logger = logging.getLogger("main")
 import argparse
 import sys
 import os
-import copy
 import json
 import datetime
 from zoneinfo import ZoneInfo
@@ -12,7 +11,6 @@ import random
 
 import torch
 import numpy as np
-
 
 
 def set_seeds_all(seed=1):
@@ -74,7 +72,6 @@ def set_logger(output_folder_dir, args):
 
 
 def register_args_and_configs(args):
-
     # Make outer output dir.
     if not os.path.isdir(args.output_folder_dir):
         os.makedirs(args.output_folder_dir)
@@ -147,9 +144,7 @@ def register_slurm_sbatch_info():
     return {"slurm_job_id": slurm_job_id, "slurm_job_name": slurm_job_name, "slurm_out_file_dir": slurm_out_file_dir}
 
 
-
 def register_result(raw_results, config):
-    
     raw_results_path = config['management']['output_folder_dir'] + config['management']['sub_dir']['raw_results']
     with open(raw_results_path, "w+") as raw_results_f:
         json.dump(raw_results, raw_results_f, indent = 4)

@@ -69,6 +69,7 @@ def train(config):
         result = test(model, whole_data)
         train_logger.add_result(result)
         train_acc, valid_acc, test_acc = result
+        
         # save the model with the best valid acc
         if valid_acc > best_val:
             save_model(model, save_path, checkpoint_prefix, epoch)

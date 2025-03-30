@@ -3,9 +3,9 @@ from tqdm import tqdm
 import torch
 from torch import Tensor
 import torch.nn.functional as F
-from torch.nn import ModuleList, Linear, BatchNorm1d, Sequential, ReLU
+from torch.nn import Linear, BatchNorm1d, Sequential, ReLU
 from torch_sparse import SparseTensor
-from torch_geometric.nn import GINConv, global_add_pool
+from torch_geometric.nn import GINConv
 from .base import BaseGNNModel
 
 from .mlp import MLP
@@ -100,7 +100,6 @@ class GIN_MLP(BaseGNNModel):
                  saved_ckpt_path: str = ''):
         super(GIN_MLP, self).__init__(in_channels, hidden_channels, out_channels,
                                   num_layers, dropout, batch_norm, residual)
-        # self.alpha, self.theta = alpha, theta
 
         if load_pretrained_backbone:
             self.GIN = GIN.from_pretrained(

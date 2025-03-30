@@ -2,8 +2,6 @@ import os
 import logging
 logger = logging.getLogger("main")
 
-import torch
-
 import models as models
 from main_utils import set_seeds_all
 from data import get_data, prepare_dataset

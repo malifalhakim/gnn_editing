@@ -1,9 +1,6 @@
 from tqdm import tqdm
-import torch
 from torch import Tensor
-from torch.nn import ModuleList, BatchNorm1d
 from torch_sparse import SparseTensor
-from torch_geometric.nn import GCNConv
 from .base import BaseGNNModel
 
 from .gcn import GCN
@@ -19,7 +16,6 @@ class SAGE_MLP(BaseGNNModel):
                  saved_ckpt_path: str = ''):
         super(SAGE_MLP, self).__init__(in_channels, hidden_channels, out_channels,
                                   num_layers, dropout, batch_norm, residual)
-        # self.alpha, self.theta = alpha, theta
 
         if load_pretrained_backbone:
             self.SAGE = SAGE.from_pretrained(

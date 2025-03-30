@@ -4,7 +4,6 @@ from torch import Tensor
 from torch.nn import ModuleList, BatchNorm1d
 from torch_sparse import SparseTensor
 from pathlib import Path
-import pdb
 
 from tqdm import tqdm
 
@@ -34,7 +33,6 @@ class BaseModel(torch.nn.Module):
     @classmethod
     def from_pretrained(cls, in_channels: int, out_channels: int, saved_ckpt_path: str, **kwargs):
         model = cls(in_channels=in_channels, out_channels=out_channels, **kwargs)
-        #pdb.set_trace()
         if not saved_ckpt_path.endswith('.pt'):
             checkpoints = [str(x) for x in Path(saved_ckpt_path).glob(f"{cls.__name__}_*.pt")]
             if '_Lora' in cls.__name__:
@@ -43,10 +41,7 @@ class BaseModel(torch.nn.Module):
                 glob_checkpoints = [x for x in checkpoints if '_MLP' not in x]
             else:
                 glob_checkpoints = checkpoints
-            # print(checkpoints)
-
-            # checkpoints = [str(x) for x in Path(saved_ckpt_path).glob(f"{cls.__name__}_run*.pt")]
-            # glob_checkpoints = checkpoints
+            
             assert len(glob_checkpoints) == 1
             saved_ckpt_path = glob_checkpoints[0]
         print(f'load model weights from {saved_ckpt_path}')

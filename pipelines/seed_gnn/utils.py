@@ -3,16 +3,13 @@ import time
 import logging
 import re
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import List
 from tqdm import tqdm
 logger = logging.getLogger("main")
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch_geometric.data.data import Data
-
-from models.base import BaseModel
 from edit_gnn.utils import grab_input, test
 
 def get_optimizer(model_config, model, pretrain=False):

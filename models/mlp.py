@@ -37,7 +37,6 @@ class MLP(BaseModel):
             lin = self.lins[idx]
             h = lin(x, *args, **kwargs)
             if self.batch_norm:
-                # import pdb; pdb.set_trace()
                 h = self.bns[idx](h)
             if self.residual and h.size(-1) == x.size(-1):
                 h += x[:h.size(0)]
