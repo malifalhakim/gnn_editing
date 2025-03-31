@@ -131,8 +131,6 @@ class GIN(BaseGNNModel):
             # Apply residual connection if dimensions match
             if self.residual and h.size(-1) == x.size(-1):
                 h += x[:h.size(0)]
-                
-            x = h
 
         # Final classification layers
         x = F.relu(self.batch_norm1(self.lin1(x)))
