@@ -147,7 +147,7 @@ def seed_gnn_edit(
             model=model,
             whole_data=whole_data,
             idx=all_nodes,
-            label=all_labels,
+            f_label=all_labels,
             optimizer=optimizer,
             max_num_step=max_num_step,
             num_edit_targets=idx + 1,
