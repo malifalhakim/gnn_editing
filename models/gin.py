@@ -71,7 +71,7 @@ class GIN(BaseGNNModel):
                 Linear(in_dim, 2 * hidden_channels),
                 BatchNorm1d(2 * hidden_channels),
                 ReLU(),
-                Linear(2 * hidden_channels, out_dim),
+                Linear(2 * hidden_channels, hidden_channels),
             )
             
             # Create GIN convolution with learnable epsilon
