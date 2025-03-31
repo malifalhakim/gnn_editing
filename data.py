@@ -1,7 +1,7 @@
 import logging
 logger = logging.getLogger("main")
 
-from typing import Tuple, Union, Optional
+from typing import Tuple
 import time
 import numpy as np
 import pandas as pd
@@ -135,6 +135,7 @@ def get_sbm(root: str, name: str) -> Tuple[Data, int, int]:
     data.ptr = None
     return data, dataset.num_features, dataset.num_classes
 
+
 def get_yelpchi(root: str, name: str) -> Tuple[Data, int, int]:
     dataset = sio.loadmat(root, verify_compressed_data_integrity=False)
     num_features = dataset['features'].shape[1]
@@ -145,6 +146,7 @@ def get_yelpchi(root: str, name: str) -> Tuple[Data, int, int]:
     train_mask, val_mask, test_mask = gen_masks(y, 0.5, 0.3, 20)
     data = Data(x=x, y=y, edge_index=edge_index, train_mask = train_mask, val_mask = val_mask, test_mask = test_mask)
     return data, num_features, num_classes
+
 
 def get_data(root: str, name: str) -> Tuple[Data, int, int]:
     if name.lower() in ['cora', 'citeseer', 'pubmed']:

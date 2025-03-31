@@ -2,7 +2,7 @@ import os
 import logging
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, Any, Callable, Optional, Tuple
+from typing import Dict, Any, Callable
 
 import torch
 import torch.nn.functional as F
