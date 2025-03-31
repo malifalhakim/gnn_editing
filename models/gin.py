@@ -1,3 +1,5 @@
+from tqdm import tqdm
+
 import torch
 from torch import Tensor
 import torch.nn.functional as F
@@ -5,7 +7,6 @@ from torch.nn import Linear, BatchNorm1d, Sequential, ReLU, ModuleList
 from torch_sparse import SparseTensor
 from torch_geometric.nn import GINConv
 from .base import BaseGNNModel
-
 from .mlp import MLP
 
 
@@ -51,92 +52,89 @@ class GIN(BaseGNNModel):
             dropout=dropout, 
             batch_norm=batch_norm, 
             residual=residual, 
-            use_linear=use_linear
-        )
+            use_linear=use_linear)
         
-        # Create separate batch norm layers specific to GIN
-        self.batch_norms = ModuleList()
+        self.batch_norms = torch.nn.ModuleList()
 
-        # Initialize GIN convolution layers
         for i in range(num_layers):
-            # Calculate input and output dimensions based on layer position
             in_dim = out_dim = hidden_channels
             if i == 0:
                 in_dim = in_channels
             if i == num_layers - 1:
                 out_dim = out_channels
-                
-            # Create MLP for GIN layer
+                num_heads = 1
             mlp = Sequential(
                 Linear(in_dim, 2 * hidden_channels),
                 BatchNorm1d(2 * hidden_channels),
                 ReLU(),
                 Linear(2 * hidden_channels, hidden_channels),
             )
-            
-            # Create GIN convolution with learnable epsilon
             conv = GINConv(mlp, train_eps=True)
             self.convs.append(conv)
-            self.batch_norms.append(BatchNorm1d(out_dim))
-            
-            # Add linear projection if requested
-            if self.use_linear:
-                self.lins.append(Linear(in_dim, out_dim, bias=False))
+            self.batch_norms.append(BatchNorm1d(hidden_channels))
 
-        # Optional final classification layers
         self.lin1 = Linear(hidden_channels, hidden_channels)
         self.batch_norm1 = BatchNorm1d(hidden_channels)
         self.lin2 = Linear(hidden_channels, out_channels)
 
-    def reset_parameters(self) -> None:
-        """Reset all model parameters."""
-        for conv in self.convs:
-            conv.reset_parameters()
-            
-        for bn in self.batch_norms:
-            bn.reset_parameters()
-            
-        if self.use_linear:
-            for lin in self.lins:
-                lin.reset_parameters()
-                
-        self.lin1.reset_parameters()
-        self.batch_norm1.reset_parameters()
-        self.lin2.reset_parameters()
 
     def forward(self, x: Tensor, adj_t: SparseTensor, *args, **kwargs) -> Tensor:
-        """
-        Forward pass through the GIN model.
-        
-        Args:
-            x: Node feature tensor
-            adj_t: Adjacency tensor in sparse format
-            *args: Additional positional arguments
-            **kwargs: Additional keyword arguments
-            
-        Returns:
-            Output tensor with log-softmax probabilities
-        """
-        # Process through GIN layers
         for idx, (conv, batch_norm) in enumerate(zip(self.convs, self.batch_norms)):
-            # Apply GIN convolution and batch normalization
             x = F.relu(batch_norm(conv(x, adj_t)))
-            
-            # Apply linear transformation if specified
+
             if self.use_linear:
                 linear = self.lins[idx](x)
                 h = h + linear
-                
-            # Apply residual connection if dimensions match
+
             if self.residual and h.size(-1) == x.size(-1):
                 h += x[:h.size(0)]
 
-        # Final classification layers
+        #x = global_add_pool(x, batch)
         x = F.relu(self.batch_norm1(self.lin1(x)))
         x = F.dropout(x, p=0.5, training=self.training)
         x = self.lin2(x)
-        
         return F.log_softmax(x, dim=-1)
+
+
+    @torch.no_grad()
+    def forward_layer(self, layer, x, adj_t, size):
+        if self.use_linear:
+            raise NotImplementedError
+        
+        if layer != 0:
+            x = self.dropout(x)
+
+        x_target = x[:size[1]]
+
+        h = self.convs[layer]((x, x_target), adj_t)
+
+        if layer < self.num_layers - 1:
+            if self.batch_norm:
+                h = self.bns[layer](h)
+            if self.residual and h.size(-1) == x.size(-1):
+                h += x[:h.size(0)]
+            h = F.relu(h)
+
+        return h
+
+
+    @torch.no_grad()
+    def mini_inference(self, x_all, loader):
+        pbar = tqdm(total=x_all.size(0) * len(self.convs))
+        pbar.set_description('Evaluating')
+
+        for i in range(len(self.convs)):
+            xs = []
+            for batch_size, n_id, adj in loader:
+                edge_index, _, size = adj.to('cuda')
+                x = x_all[n_id].to('cuda')
+                xs.append(self.forward_layer(i, x, edge_index, size).cpu())
+                pbar.update(batch_size)
+            x_all = torch.cat(xs, dim=0)
+
+        pbar.close()
+        return x_all
+
 
 
 class GIN_MLP(BaseGNNModel):
@@ -223,92 +221,56 @@ class GIN_MLP(BaseGNNModel):
             residual=residual
         )
 
-        # Initialize state
         self.mlp_freezed = True
-        self.gnn_output = None
-        
-        # Set initial frozen/unfrozen state
         if load_pretrained_backbone:
             self.freeze_layer(self.GIN, freeze=True)
-            self.freeze_layer(self.MLP, freeze=True)
+            self.freeze_layer(self.GIN, freeze=True)
             self.mlp_freezed = True
         else:
             self.freeze_module(train=True)
+        self.gnn_output = None
 
-    def reset_parameters(self) -> None:
-        """Reset all model parameters."""
-        self.GIN.reset_parameters()
-        self.MLP.reset_parameters()
 
-    def freeze_layer(self, model: torch.nn.Module, freeze: bool = True) -> None:
-        """
-        Freeze or unfreeze a model's parameters.
-        
-        Args:
-            model: Model to freeze or unfreeze
-            freeze: If True, parameters will be frozen (requires_grad=False)
-                   If False, parameters will be trainable (requires_grad=True)
-        """
-        for param in model.parameters():
-            param.requires_grad = not freeze
+    def reset_parameters(self):
+        ### reset GIN parameters
+        for conv in self.GIN.convs:
+            conv.reset_parameters()
+        if self.GIN.batch_norm:
+            for bn in self.GIN.bns:
+                bn.reset_parameters()
 
-    def freeze_module(self, train: bool = True) -> None:
-        """
-        Configure which components should be trained.
-        
-        Args:
-            train: If True, train GIN and freeze MLP
-                  If False, freeze GIN and train MLP
-        """
+        ### reset MLP parameters
+        for lin in self.MLP.lins:
+            lin.reset_parameters()
+        if self.MLP.batch_norm:
+            for bn in self.MLP.bns:
+                bn.reset_parameters()
+
+    def freeze_layer(self, model, freeze=True):
+        for name, p in model.named_parameters():
+            p.requires_grad = not freeze
+
+    def freeze_module(self, train=True):
+        ### train indicates whether train/eval editable ability
         if train:
-            # Train GIN, freeze MLP
             self.freeze_layer(self.GIN, freeze=False)
             self.freeze_layer(self.MLP, freeze=True)
             self.mlp_freezed = True
         else:
-            # Freeze GIN, train MLP
             self.freeze_layer(self.GIN, freeze=True)
             self.freeze_layer(self.MLP, freeze=False)
             self.mlp_freezed = False
 
     def forward(self, x: Tensor, adj_t: SparseTensor, *args, **kwargs) -> Tensor:
-        """
-        Forward pass through GIN and optionally MLP.
-        
-        Args:
-            x: Node feature matrix
-            adj_t: Adjacency matrix in sparse format
-            *args: Additional positional arguments
-            **kwargs: Additional keyword arguments
-            
-        Returns:
-            Model output tensor
-        """
         GIN_out = self.GIN(x, adj_t, *args)
-        
         if self.mlp_freezed:
-            # Only use GIN output if MLP is frozen
             x = GIN_out
         else:
-            # Combine GIN and MLP outputs
             MLP_out = self.MLP(x, *args)
             x = GIN_out + MLP_out
-            
         return x
 
-    def fast_forward(self, x: Tensor, idx: Tensor) -> Tensor:
-        """
-        Accelerated forward pass using cached GNN outputs.
-        
-        Args:
-            x: Input features
-            idx: Node indices to process
-            
-        Returns:
-            Model output for the specified nodes
-        """
-        assert self.gnn_output is not None, "GNN output must be cached before calling fast_forward"
-        assert not self.mlp_freezed, "MLP must be unfrozen to use fast_forward"
-        
-        return (self.gnn_output[idx.to(self.gnn_output.device)].to(x.device) + 
-                self.MLP(x))
+    def fast_forward(self, x: Tensor, idx) -> Tensor:
+        assert self.gnn_output is not None
+        assert not self.mlp_freezed
+        return self.gnn_output[idx.to(self.gnn_output.device)].to(x.device) + self.MLP(x)
