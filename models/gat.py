@@ -24,7 +24,9 @@ class GAT(BaseGNNModel):
                  dropout: float = 0.0,
                  batch_norm: bool = False, 
                  residual: bool = False, 
-                 use_linear: bool = False):
+                 use_linear: bool = False,
+                 load_pretrained_backbone: bool = False,
+                 saved_ckpt_path: str = ''):
         """
         Initialize the GAT model.
         
@@ -86,6 +88,7 @@ class GAT_MLP(BaseGNNModel):
                  out_channels: int, 
                  num_layers: int, 
                  heads: int = 8,
+                 shared_weights: bool = True, 
                  dropout: float = 0.0,
                  batch_norm: bool = False, 
                  residual: bool = False,

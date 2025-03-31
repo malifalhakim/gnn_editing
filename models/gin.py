@@ -25,7 +25,9 @@ class GIN(BaseGNNModel):
                  dropout: float = 0.0,
                  batch_norm: bool = False, 
                  residual: bool = False, 
-                 use_linear: bool = False):
+                 use_linear: bool = False,
+                 load_pretrained_backbone: bool = False,
+                 saved_ckpt_path: str = ''):
         """
         Initialize the GIN model.
         

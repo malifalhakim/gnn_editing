@@ -27,6 +27,7 @@ class SAGE_MLP(BaseGNNModel):
                  hidden_channels: int,
                  out_channels: int, 
                  num_layers: int,
+                 shared_weights: bool = True, 
                  dropout: float = 0.0,
                  batch_norm: bool = False, 
                  residual: bool = False,

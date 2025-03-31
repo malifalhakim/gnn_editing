@@ -27,6 +27,7 @@ class GCN_MLP(BaseGNNModel):
                  out_channels: int, 
                  num_layers: int,
                  dropout: float = 0.0,
+                 shared_weights: bool = True, 
                  batch_norm: bool = False, 
                  residual: bool = False,
                  load_pretrained_backbone: bool = False,
