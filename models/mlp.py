@@ -87,7 +87,7 @@ class MLP(BaseModel):
         # Process through all layers except the last one
         for idx in range(self.num_layers - 1):
             lin = self.lins[idx]
-            h = lin(x)  # Linear layers don't use args/kwargs
+            h = lin(x, *args, **kwargs) 
             
             # Apply batch normalization if specified
             if self.batch_norm:

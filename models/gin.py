@@ -120,8 +120,7 @@ class GIN(BaseGNNModel):
         # Process through GIN layers
         for idx, (conv, batch_norm) in enumerate(zip(self.convs, self.batch_norms)):
             # Apply GIN convolution and batch normalization
-            h = batch_norm(conv(x, adj_t))
-            h = F.relu(h)
+            x = F.relu(batch_norm(conv(x, adj_t)))
             
             # Apply linear transformation if specified
             if self.use_linear:
