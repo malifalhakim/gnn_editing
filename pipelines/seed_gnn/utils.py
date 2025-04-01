@@ -164,10 +164,9 @@ def _finetune_mlp(
         log_prob = F.log_softmax(mlp_output + batch_gnn_output, dim=-1)
         main_loss = F.cross_entropy(mlp_output + batch_gnn_output, train_data.y[idx])
         kl_loss = F.kl_div(log_prob, log_gnn_output[idx], log_target=True, reduction='batchmean')
-        reg_loss = model.MLP.get_regularization_loss()
 
         # Update weights
-        total_loss = kl_loss + main_loss + reg_loss
+        total_loss = kl_loss + main_loss
         total_loss.backward()
         optimizer.step()
     
