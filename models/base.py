@@ -4,7 +4,7 @@ from torch import Tensor
 from torch.nn import ModuleList, BatchNorm1d
 from torch_sparse import SparseTensor
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Union, Tuple
+from typing import Tuple
 
 from tqdm import tqdm
 

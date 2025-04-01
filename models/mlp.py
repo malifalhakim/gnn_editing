@@ -3,7 +3,6 @@ from torch.nn import Linear, ModuleList, LayerNorm, Parameter
 import torch
 import torch.nn.functional as F
 from torch.nn.utils import spectral_norm
-import math
 
 from .base import BaseModel
 
