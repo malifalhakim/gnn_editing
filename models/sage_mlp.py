@@ -89,7 +89,12 @@ class SAGE_MLP(BaseGNNModel):
             num_layers=num_layers, 
             dropout=dropout,
             batch_norm=batch_norm, 
-            residual=residual
+            residual=residual,
+            layer_norm=True,              # Enable layer normalization
+            spectral_norm_enabled=True,   # Enable spectral normalization
+            activity_regularization=1e-4, # Add L2 penalty on activations
+            dropout_type='concrete',      # Use concrete dropout instead of standard
+            weight_decay=1e-5          # L2 regularization strength (used during optimization)
         )
 
         # Set initial frozen state
