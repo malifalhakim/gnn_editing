@@ -312,7 +312,7 @@ def _single_edit(
         # Forward pass (different for GNN+MLP models)
         if model.__class__.__name__ in ['GCN_MLP', 'SAGE_MLP', 'GAT_MLP', 'GIN_MLP']:
             out = model.fast_forward(input_data['x'][idx], idx)
-            loss = loss_op(out, label)
+            loss = loss_op(out, label) + model.MLP.get_regularization_loss()
             y_pred = out.argmax(dim=-1)
         else:
             out = model(**input_data)
