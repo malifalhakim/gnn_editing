@@ -163,10 +163,16 @@ def _select_mixup_training_nodes(
             remaining = num_general_nodes - len(general_selection)
             additional = right_pred_set[torch.randperm(len(right_pred_set))[:remaining]]
             general_selection = torch.cat([general_selection, additional])
-        # log class distribution
+        
+        # Get the actual node indices and their class labels for logging
+        selected_nodes = nodes_set[general_selection.squeeze()]
+        selected_classes = whole_data.y[selected_nodes]
+        
+        # Log class distribution
         logger.info("Class distribution of selected nodes:")
         for c in range(num_classes):
-            logger.info(f"Class {c}: {torch.sum(general_selection == c) / len(general_selection)}")
+            class_count = (selected_classes == c).sum().item()
+            logger.info(f"Class {c}: {class_count / len(selected_classes):.4f}")
     else:
         logger.warning("No nodes selected from the general pool. Fallback to random selection.")
         # Fallback to random selection if class-based selection fails
