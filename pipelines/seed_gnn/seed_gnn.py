@@ -1,5 +1,6 @@
 from tqdm import tqdm
 from copy import deepcopy
+import logging
 from typing import Dict, List, Tuple, Any, Optional, Union
 
 import torch
@@ -10,6 +11,8 @@ from main_utils import set_seeds_all
 from models.base import BaseModel
 from edit_gnn.utils import test, success_rate, prediction
 from pipelines.seed_gnn.utils import get_optimizer, edit
+
+logger = logging.getLogger("main")
 
 
 def _select_mixup_training_nodes(
@@ -130,7 +133,12 @@ def _select_mixup_training_nodes(
             remaining = num_general_nodes - len(general_selection)
             additional = right_pred_set[torch.randperm(len(right_pred_set))[:remaining]]
             general_selection = torch.cat([general_selection, additional])
+        # log class distribution
+        logger.info("Class distribution of selected nodes:")
+        for c in range(num_classes):
+            logger.info(f"Class {c}: {torch.sum(general_selection == c) / len(general_selection)}")
     else:
+        logger.warning("No nodes selected from the general pool. Fallback to random selection.")
         # Fallback to random selection if class-based selection fails
         general_selection = right_pred_set[torch.randperm(len(right_pred_set))[:num_general_nodes]]
     
