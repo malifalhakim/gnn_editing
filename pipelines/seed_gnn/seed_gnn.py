@@ -21,6 +21,7 @@ def _select_mixup_training_nodes(
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Select nodes for mixup training based on model predictions and neighborhood.
+    Class-distribution aware selection for more balanced training.
     
     Args:
         model: The GNN model to use
@@ -72,10 +73,66 @@ def _select_mixup_training_nodes(
         torch.randperm(len(correct_neighbors))[:num_neighborhood_nodes]
     ].to(device)
     
-    # Random sample from general correctly predicted nodes
-    general_selection = right_pred_set[
-        torch.randperm(len(right_pred_set))[:num_general_nodes]
-    ]
+    # Get the class of the center node (target class for editing)
+    target_class = whole_data.y[center_node_idx].item()
+    
+    # Get classes of correctly predicted nodes
+    right_pred_nodes = nodes_set[right_pred_set.squeeze()]
+    right_pred_classes = whole_data.y[right_pred_nodes]
+    
+    # Count number of classes in the dataset
+    num_classes = whole_data.y.max().item() + 1
+    
+    # Class-aware node selection
+    selected_indices = []
+    
+    # Calculate base nodes per class and extra nodes for target class
+    base_nodes_per_class = num_general_nodes // num_classes
+    extra_nodes = num_general_nodes - (base_nodes_per_class * num_classes)
+    
+    # Prioritize the target class
+    nodes_per_class = {
+        c: base_nodes_per_class + (extra_nodes if c == target_class else 0)
+        for c in range(num_classes)
+    }
+    
+    # Select nodes from each class
+    for class_idx in range(num_classes):
+        # Get indices of correctly predicted nodes for this class
+        class_mask = (right_pred_classes == class_idx)
+        class_indices = torch.nonzero(class_mask).squeeze()
+        
+        # Handle case where class_indices might be empty or a single item
+        if class_indices.numel() == 0:
+            continue
+        elif class_indices.numel() == 1:
+            class_indices = class_indices.unsqueeze(0)
+        
+        # Select nodes from this class
+        n_to_select = min(nodes_per_class[class_idx], len(class_indices))
+        if n_to_select > 0:
+            # Random sample from this class
+            indices = torch.randperm(len(class_indices))[:n_to_select]
+            selected_class_nodes = right_pred_set[class_indices[indices]]
+            selected_indices.append(selected_class_nodes)
+    
+    # Combine all selected nodes
+    if selected_indices:
+        general_selection = torch.cat(selected_indices)
+        
+        # Handle case where we might have selected more than needed
+        if len(general_selection) > num_general_nodes:
+            general_selection = general_selection[:num_general_nodes]
+        
+        # Handle case where we might not have enough nodes
+        elif len(general_selection) < num_general_nodes:
+            # Fill remaining slots with random selections
+            remaining = num_general_nodes - len(general_selection)
+            additional = right_pred_set[torch.randperm(len(right_pred_set))[:remaining]]
+            general_selection = torch.cat([general_selection, additional])
+    else:
+        # Fallback to random selection if class-based selection fails
+        general_selection = right_pred_set[torch.randperm(len(right_pred_set))[:num_general_nodes]]
     
     # Combine both selections
     train_mixup_indices = torch.cat((neighborhood_selection, general_selection), dim=0)
