@@ -86,18 +86,48 @@ def _select_mixup_training_nodes(
     # Count number of classes in the dataset
     num_classes = whole_data.y.max().item() + 1
     
-    # Class-aware node selection
+    # Calculate original class distribution in training set
+    train_y = whole_data.y[whole_data.train_mask]
+    class_counts = [(train_y == c).sum().item() for c in range(num_classes)]
+    total_train_nodes = len(train_y)
+    class_proportions = [count / total_train_nodes for count in class_counts]
+    
+    # Log original class distribution
+    logger.info("Original class distribution in training set:")
+    for c in range(num_classes):
+        logger.info(f"Class {c}: {class_proportions[c]:.4f}")
+    
+    # Class-aware node selection following original distribution
     selected_indices = []
     
-    # Calculate base nodes per class and extra nodes for target class
-    base_nodes_per_class = num_general_nodes // num_classes
-    extra_nodes = num_general_nodes - (base_nodes_per_class * num_classes)
+    # Calculate nodes per class based on original distribution
+    # with a boost factor for the target class
+    boost_factor = 1.2  # Increase representation of target class by 20%
+    target_boost = min(boost_factor, 1.0 / class_proportions[target_class])  # Prevent over-allocation
     
-    # Prioritize the target class
+    # Normalize proportions after boosting target class
+    adjusted_proportions = class_proportions.copy()
+    adjusted_proportions[target_class] *= target_boost
+    total_adjusted = sum(adjusted_proportions)
+    adjusted_proportions = [p / total_adjusted for p in adjusted_proportions]
+    
+    # Calculate nodes per class based on adjusted proportions
     nodes_per_class = {
-        c: base_nodes_per_class + (extra_nodes if c == target_class else 0)
+        c: max(1, int(num_general_nodes * adjusted_proportions[c]))
         for c in range(num_classes)
     }
+    
+    # Ensure we don't exceed the target number of nodes
+    total_allocated = sum(nodes_per_class.values())
+    if total_allocated > num_general_nodes:
+        # Scale down proportionally
+        scale_factor = num_general_nodes / total_allocated
+        nodes_per_class = {c: max(1, int(n * scale_factor)) for c, n in nodes_per_class.items()}
+    
+    # Log adjusted class distribution
+    logger.info("Adjusted class distribution for node selection:")
+    for c in range(num_classes):
+        logger.info(f"Class {c}: {nodes_per_class[c] / num_general_nodes:.4f} ({nodes_per_class[c]} nodes)")
     
     # Select nodes from each class
     for class_idx in range(num_classes):
